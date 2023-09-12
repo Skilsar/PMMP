@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Image Processing with OpenCV.js</title>
+    <script
+      async
+      src="https://docs.opencv.org/master/opencv.js"
+      onload="onOpenCvReady();"
+      type="text/javascript"
+    ></script>
+    <style>
+      .container__img {
+        display: flex;
+      }
+
+      .container__img > canvas {
+        max-width: 50%;
+      }
+    </style>
+  </head>
+  <body>
+    <input type="file" id="imageInput" accept="image/*" />
+    <br />
+    <button onclick="loadImage()">Load Image</button>
+    <button onclick="applyLinearFilter()">Apply Linear Filter</button>
+    <button onclick="applySmoothing()">Apply Smoothing</button>
+    <button onclick="applyErosion()">Apply Erosion</button>
+    <button onclick="applyDilation()">Apply Dilation</button>
+    <button onclick="applyErosionWithAdaptiveThreshold()">
+      Apply Erosion with Adaptive Threshold
+    </button>
+    <button onclick="applyDilationWithAdaptiveThreshold()">
+      Apply Dilation with Adaptive Threshold
+    </button>
+    <br />
+    <div class="container__img">
+      <canvas class="img__uploaded" id="canvas"></canvas>
+      <canvas class="img__edited" id="resultCanvas"></canvas>
+    </div>
+
+    <script>
+      let originalImage;
+      let resultImage;
+
+      // Функция, вызываемая после загрузки OpenCV.js
+      function onOpenCvReady() {
+        console.log("OpenCV.js is ready.");
+      }
+
+      // Загрузить изображение с диска
+      function loadImage() {
+        const input = document.getElementById("imageInput");
+        const canvas = document.getElementById("canvas");
+        const ctx = canvas.getContext("2d");
+
+        const file = input.files[0];
+        const reader = new FileReader();
+
+        reader.onload = function (event) {
+          const img = new Image();
+          img.src = event.target.result;
+
+          img.onload = function () {
+            canvas.width = img.width;
+            canvas.height = img.height;
+            ctx.drawImage(img, 0, 0);
+            originalImage = cv.imread(canvas);
+          };
+        };
+
+        reader.readAsDataURL(file);
+      }
+
+      // Применить линейный фильтр к изображению
+      function applyLinearFilter() {
+        if (originalImage) {
+          resultImage = new cv.Mat();
+          // Здесь можно применить фильтр с различными коэффициентами ядра
+          // Например, можно использовать cv.filter2D() для свертки с ядром
+          cv.filter2D(
+            originalImage,
+            resultImage,
+            -1,//глубина результ. изобр, -1 — глубина входного и выходного равны
+            // cv.Mat.ones(3, 3, cv.CV_32F) для усиления контраста
+            cv.Mat.ones(3, 3, cv.CV_32F), //ядро свертки
+            new cv.Point(-1, -1), //ведущая позиция ядра (центр default) 
+            0,  //добавляется к значению интенсивности после фильтрации
+            cv.BORDER_DEFAULT //принцип работы с границами
+          );
+          cv.imshow("resultCanvas", resultImage);
+        }
+      }
+
+      // Применить размытие к изображению 
+      function applySmoothing() {
+        if (originalImage) {
+          resultImage = new cv.Mat();
+          cv.blur(originalImage, resultImage, new cv.Size(5, 5)); //3-ий пар. - размер ядра для размытия 
+          cv.imshow("resultCanvas", resultImage);
+        }
+      }
+
+      // Применить эрозию к изображению (к бинарному изображению)
+      function applyErosion() {
+        if (originalImage) {
+          resultImage = new cv.Mat();
+          // Увеличьте размер структурного элемента для более заметной эрозии
+          cv.erode(
+            originalImage,
+            resultImage,
+            cv.Mat.ones(5, 5, cv.CV_8U),  //ядро преобразования
+            new cv.Point(-1, -1),         //позиция якоря
+            1,                            //кол-во применений
+            cv.BORDER_CONSTANT,           //экстраполяция границы
+            cv.morphologyDefaultBorderValue()
+          );
+          cv.imshow("resultCanvas", resultImage);
+        }
+      }
+
+      // Применить дилатацию к изображению (к бинарному изображению)
+      function applyDilation() {
+        if (originalImage) {
+          resultImage = new cv.Mat();
+          cv.dilate(
+            originalImage,
+            resultImage,
+            cv.Mat.ones(3, 3, cv.CV_8U),
+            new cv.Point(-1, -1),
+            1,
+            cv.BORDER_CONSTANT,
+            cv.morphologyDefaultBorderValue()
+          );
+          cv.imshow("resultCanvas", resultImage);
+        }
+      }
+
+      // Применить эрозию с адаптивной бинаризацией к изображению
+      function applyErosionWithAdaptiveThreshold() {
+        if (originalImage) {
+          const grayImage = new cv.Mat();
+          cv.cvtColor(originalImage, grayImage, cv.COLOR_RGBA2GRAY);
+
+          const binaryImage = new cv.Mat();
+          cv.adaptiveThreshold(
+            grayImage,
+            binaryImage,
+            255,
+            cv.ADAPTIVE_THRESH_GAUSSIAN_C,
+            cv.THRESH_BINARY,
+            11,
+            2
+          );
+
+          resultImage = new cv.Mat();
+          cv.erode(
+            binaryImage,
+            resultImage,
+            cv.Mat.ones(3, 3, cv.CV_8U),
+            new cv.Point(-1, -1),
+            1,
+            cv.BORDER_CONSTANT,
+            cv.morphologyDefaultBorderValue()
+          );
+
+          cv.imshow("resultCanvas", resultImage);
+
+          grayImage.delete();
+          binaryImage.delete();
+        }
+      }
+
+      // Применить дилатацию с адаптивной бинаризацией к изображению
+      function applyDilationWithAdaptiveThreshold() {
+        if (originalImage) {
+          const grayImage = new cv.Mat();
+          cv.cvtColor(originalImage, grayImage, cv.COLOR_RGBA2GRAY);
+
+          const binaryImage = new cv.Mat();
+          cv.adaptiveThreshold(
+            grayImage,
+            binaryImage,
+            255,
+            cv.ADAPTIVE_THRESH_GAUSSIAN_C,
+            cv.THRESH_BINARY,
+            11,
+            2
+          );
+
+          resultImage = new cv.Mat();
+          cv.dilate(
+            binaryImage,
+            resultImage,
+            cv.Mat.ones(3, 3, cv.CV_8U),
+            new cv.Point(-1, -1),
+            1,
+            cv.BORDER_CONSTANT,
+            cv.morphologyDefaultBorderValue()
+          );
+
+          cv.imshow("resultCanvas", resultImage);
+
+          grayImage.delete();
+          binaryImage.delete();
+        }
+      }
+    </script>
+  </body>
+</html>
