@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Image Processing</title>
+    <script
+      async
+      src="opencv.js"
+      onload="onOpenCvReady();"
+      type="text/javascript"
+    ></script>
+  </head>
+  <body>
+    <input type="file" id="imageInput" accept="image/*" />
+    <canvas id="canvas"></canvas>
+    <script type="text/javascript">
+      let src;
+      let dst;
+      let gray;
+      let lowThresh = 50;
+      let highThresh = 150;
+
+      function onOpenCvReady() {
+        document
+          .getElementById("imageInput")
+          .addEventListener("change", handleImage, false);
+      }
+
+      function handleImage(e) {
+        let reader = new FileReader();
+        reader.onload = function (event) {
+          let img = new Image();
+          img.onload = function () {
+            src = cv.imread(img);
+            dst = new cv.Mat();
+            gray = new cv.Mat();
+            cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
+            cv.Canny(gray, dst, lowThresh, highThresh, 3, false);
+            cv.imshow("canvas", dst);
+            findContours();
+          };
+          img.src = event.target.result;
+        };
+        reader.readAsDataURL(e.target.files[0]);
+      }
+
+      function findContours() {
+        let contours = new cv.MatVector();
+        let hierarchy = new cv.Mat();
+        cv.findContours(
+          dst,
+          contours,
+          hierarchy,
+          cv.RETR_EXTERNAL,
+          cv.CHAIN_APPROX_SIMPLE
+        );
+
+        // Отрисовка контуров
+        let dst2 = cv.Mat.zeros(dst.rows, dst.cols, cv.CV_8UC3);
+        for (let i = 0; i < contours.size(); ++i) {
+          cv.drawContours(
+            dst2,
+            contours,
+            i,
+            [0, 255, 0, 255],
+            2,
+            cv.LINE_8,
+            hierarchy,
+            0
+          );
+
+          // Проверка, является ли контур четырехугольной фигурой
+          let epsilon = 0.04 * cv.arcLength(contours.get(i), true);
+          let approx = new cv.Mat();
+          cv.approxPolyDP(contours.get(i), approx, epsilon, true);
+          if (approx.rows === 4) {
+            cv.drawContours(
+              dst2,
+              contours,
+              i,
+              [255, 0, 0, 255],
+              2,
+              cv.LINE_8,
+              hierarchy,
+              0
+            );
+          }
+          approx.delete();
+        }
+
+        // Подсчет количества контуров
+        let numberOfContours = contours.size();
+        console.log("Количество контуров: " + numberOfContours);
+
+        // Нахождение контура с наибольшей длиной и площадью
+        let maxContourIdx = -1;
+        let maxContourLength = 0;
+        let maxContourArea = 0;
+        for (let i = 0; i < contours.size(); ++i) {
+          let length = cv.arcLength(contours.get(i), true);
+          let area = cv.contourArea(contours.get(i));
+          if (length > maxContourLength) {
+            maxContourLength = length;
+            maxContourIdx = i;
+          }
+          if (area > maxContourArea) {
+            maxContourArea = area;
+          }
+        }
+        console.log("Наибольшая длина контура: " + maxContourLength);
+        console.log("Наибольшая площадь контура: " + maxContourArea);
+
+        // Подсчет четырехугольных фигур
+        let quadrilateralCount = 0;
+        for (let i = 0; i < contours.size(); ++i) {
+          let epsilon = 0.04 * cv.arcLength(contours.get(i), true);
+          let approx = new cv.Mat();
+          cv.approxPolyDP(contours.get(i), approx, epsilon, true);
+          if (approx.rows === 4) {
+            quadrilateralCount++;
+          }
+          approx.delete();
+        }
+        console.log("Количество четырехугольных фигур: " + quadrilateralCount);
+
+        cv.imshow("canvas", dst2);
+        contours.delete();
+        hierarchy.delete();
+        dst2.delete();
+      }
+    </script>
+  </body>
+</html>

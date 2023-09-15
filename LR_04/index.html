@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Lab 4: Контурный анализ</title>
+    <script
+      async
+      src="opencv.js"
+      onload="onOpenCvReady();"
+      type="text/javascript"
+    ></script>
+  </head>
+  <body>
+    <h1>Lab 4: Контурный анализ</h1>
+    <input type="file" id="imageInput" accept="image/*" />
+    <canvas id="canvas"></canvas>
+    <p>Количество предметов: <span id="itemCount">0</span></p>
+    <button onclick="findContours()">Найти контуры</button>
+    <button onclick="highlightLargest()">Выделить наибольший контур</button>
+    <script>
+      let src;
+      let src_gray;
+      let canvas;
+      let ctx;
+
+      async function onOpenCvReady() {
+        canvas = document.getElementById("canvas");
+        ctx = canvas.getContext("2d");
+      }
+
+      document
+        .getElementById("imageInput")
+        .addEventListener("change", function (e) {
+          const file = e.target.files[0];
+          if (file) {
+            const reader = new FileReader();
+            reader.onload = function (e) {
+              const img = new Image();
+              img.src = e.target.result;
+              img.onload = function () {
+                canvas.width = img.width;
+                canvas.height = img.height;
+                ctx.drawImage(img, 0, 0, img.width, img.height);
+                src = cv.imread(canvas);
+                src_gray = new cv.Mat();
+                cv.cvtColor(src, src_gray, cv.COLOR_RGBA2GRAY);
+              };
+            };
+            reader.readAsDataURL(file);
+          }
+        });
+
+      function findContours() {
+        if (!src) {
+          alert("Выберите изображение.");
+          return;
+        }
+
+        const contours = new cv.MatVector();
+        const hierarchy = new cv.Mat();
+        cv.findContours(
+          src_gray,
+          contours,
+          hierarchy,
+          cv.RETR_EXTERNAL,
+          cv.CHAIN_APPROX_SIMPLE
+        );
+
+        const itemCountElement = document.getElementById("itemCount");
+        itemCountElement.innerText = contours.size();
+
+        for (let i = 0; i < contours.size(); ++i) {
+          const color = new cv.Scalar(0, 255, 0, 255); // Зеленый цвет
+          const rect = new cv.Rect(10, 10, 10, 10);
+          cv.rectangle(src, rect, color, 2);
+        }
+
+        cv.imshow(canvas, src);
+      }
+
+      function highlightLargest() {
+        if (!src) {
+          alert("Выберите изображение.");
+          return;
+        }
+
+        const contours = new cv.MatVector();
+        const hierarchy = new cv.Mat();
+        cv.findContours(
+          src_gray,
+          contours,
+          hierarchy,
+          cv.RETR_EXTERNAL,
+          cv.CHAIN_APPROX_SIMPLE
+        );
+
+        let largestContourIndex = -1;
+        let largestContourArea = 0;
+
+        for (let i = 0; i < contours.size(); ++i) {
+          const area = cv.contourArea(contours.get(i));
+          if (area > largestContourArea) {
+            largestContourArea = area;
+            largestContourIndex = i;
+          }
+        }
+
+        if (largestContourIndex !== -1) {
+          const color = new cv.Scalar(255, 0, 0, 255); // Красный цвет
+          const largestRect = cv.boundingRect(
+            contours.get(largestContourIndex)
+          );
+          cv.rectangle(src, largestRect, color, 2);
+          cv.imshow(canvas, src);
+        }
+      }
+    </script>
+  </body>
+</html>

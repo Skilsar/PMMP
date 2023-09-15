@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Image Processing</title>
+    <script async src="opencv.js" onload="onOpenCvReady();" type="text/javascript"></script>
+</head>
+<body>
+    <input type="file" id="imageInput" accept="image/*">
+    <canvas id="canvas"></canvas>
+    <script type="text/javascript">
+        let src;
+        let dst;
+        let gray;
+        let lowThresh = 50;
+        let highThresh = 150;
+
+        function onOpenCvReady() {
+            document.getElementById('imageInput').addEventListener('change', handleImage, false);
+        }
+
+        function handleImage(e) {
+            let reader = new FileReader();
+            reader.onload = function (event) {
+                let img = new Image();
+                img.onload = function () {
+                    src = cv.imread(img);
+                    dst = new cv.Mat();
+                    gray = new cv.Mat();
+                    cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
+                    cv.Canny(gray, dst, lowThresh, highThresh, 3, false);
+                    cv.imshow('canvas', dst);
+                    findContours();
+                    findLinesAndCircles();
+                };
+                img.src = event.target.result;
+            };
+            reader.readAsDataURL(e.target.files[0]);
+        }
+
+        function findContours() {
+            // Код для нахождения и отрисовки контуров (как в предыдущем ответе)
+            // ...
+        }
+
+        function findLinesAndCircles() {
+            let lines = new cv.Mat();
+            cv.HoughLines(dst, lines, 1, Math.PI / 180, 100);
+
+            // Отрисовка линий голубым цветом
+            for (let i = 0; i < lines.rows; ++i) {
+                let rho = lines.data32F[i * 2];
+                let theta = lines.data32F[i * 2 + 1];
+                let a = Math.cos(theta);
+                let b = Math.sin(theta);
+                let x0 = a * rho;
+                let y0 = b * rho;
+                let startPoint = { x: x0 + 1000 * (-b), y: y0 + 1000 * (a) };
+                let endPoint = { x: x0 - 1000 * (-b), y: y0 - 1000 * (a) };
+                cv.line(src, startPoint, endPoint, [0, 0, 255, 255], 2);
+            }
+
+            let circles = new cv.Mat();
+            cv.HoughCircles(gray, circles, cv.HOUGH_GRADIENT, 1, 10, 100, 30, 1, 30);
+
+            // Отрисовка окружностей желтым цветом
+            for (let i = 0; i < circles.cols; ++i) {
+                let x = circles.data32F[i * 3];
+                let y = circles.data32F[i * 3 + 1];
+                let radius = circles.data32F[i * 3 + 2];
+                let center = new cv.Point(x, y);
+                cv.circle(src, center, radius, [0, 255, 255, 255], 2);
+            }
+
+            // Вывод количества найденных окружностей
+            console.log("Количество найденных окружностей: " + circles.cols);
+
+            cv.imshow('canvas', src);
+
+            lines.delete();
+            circles.delete();
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>lab03</title>
+  </head>
+  <body>
+    <h1>Real-time Video Processing</h1>
+    <video id="video" width="300" height="300" autoplay></video>
+    <button id="stopButton">Stop Video</button>
+    <div>
+      <h3>Sobel:</h3>
+      <canvas id="sobel__output" width="300" height="300"></canvas>
+    </div>
+
+    <div>
+      <h3>Laplas:</h3>
+      <canvas id="laplass__output" width="300" height="300"></canvas>
+    </div>
+
+    <div>
+      <h3>Canny:</h3>
+      <canvas id="canny_output" width="300" height="300"></canvas>
+    </div>
+
+    <script src="opencv.js" onload="onOpenCvReady();" async></script>
+    <script src="./LR_03.js"></script>
+  </body>
+</html>
