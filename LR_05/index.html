@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>OpenCV.js Image Processing</title>
+
+    <!-- Подключение OpenCV.js -->
+    <script
+      async
+      src="https://docs.opencv.org/master/opencv.js"
+      onload="onOpenCvReady();"
+      type="text/javascript"
+    ></script>
+
+    <!-- Подключение библиотеки Tesseract.js -->
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
+  </head>
+  <body>
+    <h1>OpenCV.js Image Processing</h1>
+
+    <!-- Элемент для выбора изображения -->
+    <input type="file" id="imageInput" accept="image/*" />
+
+    <!-- Холсты для отображения изображений -->
+    <canvas id="imageCanvas" width="400" height="300"></canvas>
+    <canvas id="outputCanvas" width="400" height="300"></canvas>
+
+    <!-- Кнопки для выполнения операций -->
+    <button onclick="detectCornersHarris()">Detect Corners (Harris)</button>
+    <button onclick="detectCornersShiTomasi()">
+      Detect Corners (Shi-Tomasi)
+    </button>
+    <button onclick="rotateImage()">Rotate Image</button>
+    <button onclick="recognizeText()">Recognize Text</button>
+    <!-- Добавленная кнопка для распознавания текста -->
+
+    <script>
+      function onOpenCvReady() {
+        // Добавляем обработчик события изменения выбранного изображения
+        document
+          .getElementById("imageInput")
+          .addEventListener("change", handleImageUpload);
+      }
+
+      function handleImageUpload(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function (e) {
+          const imgElement = new Image();
+          imgElement.onload = function () {
+            const imageCanvas = document.getElementById("imageCanvas");
+            const ctx = imageCanvas.getContext("2d");
+
+            // Отображаем выбранное изображение на холсте
+            ctx.drawImage(
+              imgElement,
+              0,
+              0,
+              imageCanvas.width,
+              imageCanvas.height
+            );
+          };
+          imgElement.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+      }
+
+      function detectCornersHarris() {
+        // Загружаем изображение с холста
+        let img = cv.imread("imageCanvas");
+
+        // Создаем матрицу для изображения в оттенках серого
+        let gray = new cv.Mat();
+        cv.cvtColor(img, gray, cv.COLOR_RGBA2GRAY);
+
+        // Выделение характерных угловых точек с помощью детектора Харриса (лок. макс)
+        let corners = new cv.Mat();
+        cv.cornerHarris(
+          gray, // gray: Это матрица, представляющая изображение в оттенках серого, на котором вы хотите найти угловые точки.
+          corners, // corners: Это матрица, в которую будут записаны результаты детекции угловых точек.
+          2, // blockSize: Этот параметр определяет размер окна, используемого для вычисления структурных меры Харриса. Обычно это целое число (например, 2), которое определяет размер окрестности каждой точки, в которой анализируются градиенты. Большие значения приводят к более сглаженным результатам.
+          3, // ksize: Этот параметр представляет размер собственного окна Собеля, используемого для вычисления градиентов изображения. Обычно это целое нечетное число (например, 3).
+          0.01 // k: Этот параметр представляет коэффициент для вычисления структурных меры Харриса. Это значение, которое влияет на чувствительность детектора к угловым точкам. Маленькие значения (например, 0.01) сделают детектор менее чувствительным, большие значения сделают его более чувствительным. Обычно выбирается экспериментально.
+        );
+
+        // Настройка цвета угловых точек для отображения
+        let dst = new cv.Mat();
+        cv.cvtColor(img, dst, cv.COLOR_RGBA2RGB);
+        for (let i = 0; i < corners.rows; i++) {
+          for (let j = 0; j < corners.cols; j++) {
+            if (corners.data32F[i * corners.cols + j] > 0.0007) {
+              // Устанавливайте порог по вашему усмотрению
+              cv.circle(dst, new cv.Point(j, i), 5, [0, 255, 0, 255], 2);
+            }
+          }
+        }
+
+        // Отобразить изображение с выделенными угловыми точками
+        cv.imshow("outputCanvas", dst);
+
+        // Освободить ресурсы
+        img.delete();
+        gray.delete();
+        corners.delete();
+        dst.delete();
+      }
+
+      function detectCornersShiTomasi() {
+        // Загружаем изображение с холста
+        let img = cv.imread("imageCanvas");
+
+        // Создаем матрицу для изображения в оттенках серого
+        let gray = new cv.Mat();
+        cv.cvtColor(img, gray, cv.COLOR_RGBA2GRAY);
+
+        // Выделение характерных угловых точек с помощью детектора Ши Томаси (производн)
+        let corners = new cv.Mat();
+        cv.goodFeaturesToTrack(
+          gray, // gray: Это матрица, представляющая изображение в оттенках серого, на котором вы хотите найти хорошие угловые точки.
+          corners, // corners: Это матрица, в которую будут записаны результаты детекции хороших угловых точек.
+          100, // maxCorners: Этот параметр определяет максимальное количество угловых точек, которые вы хотите найти на изображении. Например, здесь установлено значение 100, что означает, что вы ищете до 100 угловых точек.
+          0.01, // qualityLevel: Этот параметр представляет пороговое значение качества угловых точек. Он определяет, насколько хорошо угол должен соответствовать определенным критериям, чтобы считаться "хорошим". Значение 0.01 обычно хорошо работает, но может быть настроено экспериментально.
+          10 // minDistance: Этот параметр определяет минимальное расстояние между найденными угловыми точками. Если две точки ближе друг к другу, чем это расстояние, то одна из них будет отброшена. Он помогает предотвратить дублирование угловых точек. Значение 10 означает, что минимальное расстояние между угловыми точками должно быть не менее 10 пикселей.
+        );
+
+        // Настройка цвета угловых точек для отображения
+        let dst = new cv.Mat();
+        cv.cvtColor(img, dst, cv.COLOR_RGBA2RGB);
+        for (let i = 0; i < corners.rows; i++) {
+          let point = new cv.Point(
+            corners.data32F[i * 2],
+            corners.data32F[i * 2 + 1]
+          );
+          cv.circle(dst, point, 5, [0, 255, 0, 255], 2);
+        }
+
+        // Отобразить изображение с выделенными угловыми точками
+        cv.imshow("outputCanvas", dst);
+
+        // Освободить ресурсы
+        img.delete();
+        gray.delete();
+        corners.delete();
+        dst.delete();
+      }
+
+      function rotateImage() {
+        // Загружаем изображение с холста
+        let img = cv.imread("imageCanvas");
+
+        // Определите матрицу преобразования для поворота изображения
+        let rotationMatrix = cv.getRotationMatrix2D(
+          new cv.Point(img.cols / 2, img.rows / 2), // center: Это точка, относительно которой будет выполняться поворот. В данном случае, центр изображения вычисляется как середина по ширине и высоте изображения (img.cols / 2, img.rows / 2).
+          45, // angle: Это угол поворота в градусах. Здесь установлено значение 45 градусов, что означает поворот изображения на 45 градусов по часовой стрелке.
+          1 // scale: Это масштабный коэффициент. Он позволяет масштабировать изображение при повороте. Здесь установлено значение 1, что означает отсутствие масштабирования.
+        );
+
+        // Применение преобразования
+        let rotatedImg = new cv.Mat();
+        cv.warpAffine(
+          img,
+          rotatedImg,
+          rotationMatrix,
+          new cv.Size(img.cols, img.rows)
+        );
+
+        // Отобразить повернутое изображение
+        cv.imshow("outputCanvas", rotatedImg);
+
+        // Освободить ресурсы
+        img.delete();
+        rotationMatrix.delete();
+        rotatedImg.delete();
+
+        // Распознавание текста с использованием Tesseract OCR
+        // recognizeText();
+      }
+
+      //   function recognizeText() {
+      //     // Загрузка изображения с холста
+      //     const imageCanvas = document.getElementById("outputCanvas");
+      //     const img = cv.imread(imageCanvas);
+
+      //     // Преобразование изображения в формат, подходящий для распознавания текста с помощью Tesseract.js
+      //     cv.cvtColor(img, img, cv.COLOR_RGBA2GRAY);
+      //     cv.imshow(imageCanvas, img);
+
+      //     // Преобразование изображения OpenCV в формат, понимаемый Tesseract.js
+      //     const tesseractImg = cv.matFromImageData(imageCanvas.toDataURL());
+
+      //     // Определение языка распознавания и запуск распознавания текста
+      //     const lang = "ru"; // Установите желаемый язык (например, "eng" для английского)
+      //     Tesseract.recognize(
+      //       tesseractImg,
+      //       lang,
+      //       { logger: (m) => console.log(m) } // Логгирование результатов в консоль
+      //     ).then(({ data: { text } }) => {
+      //       console.log("Распознанный текст:", text);
+      //     });
+
+      //     // Освобождение ресурсов
+      //     tesseractImg.delete();
+      //     img.delete();
+      //   }
+    </script>
+  </body>
+</html>

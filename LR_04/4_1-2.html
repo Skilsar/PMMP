@@ -10,32 +10,50 @@
     ></script>
   </head>
   <body>
+    <!-- Элемент для выбора изображения -->
     <input type="file" id="imageInput" accept="image/*" />
-    <canvas id="canvas"></canvas>
-    <script type="text/javascript">
-      let src;
-      let dst;
-      let gray;
-      let lowThresh = 50;
-      let highThresh = 150;
 
+    <!-- Холст для отображения обработанного изображения -->
+    <canvas id="canvas"></canvas>
+
+    <script type="text/javascript">
+      let src; // Матрица исходного изображения
+      let dst; // Матрица для обработанного изображения
+      let gray; // Матрица для изображения в оттенках серого
+      let lowThresh = 50; // Нижний порог для детектора границ Canny
+      let highThresh = 150; // Верхний порог для детектора границ Canny
+
+      // Функция вызывается после загрузки OpenCV.js
       function onOpenCvReady() {
+        // Добавляем обработчик события изменения выбранного изображения
         document
           .getElementById("imageInput")
           .addEventListener("change", handleImage, false);
       }
 
+      // Функция для обработки выбранного изображения
       function handleImage(e) {
         let reader = new FileReader();
         reader.onload = function (event) {
           let img = new Image();
           img.onload = function () {
+            // Загружаем изображение в матрицу src
             src = cv.imread(img);
+
+            // Создаем матрицы для обработки
             dst = new cv.Mat();
             gray = new cv.Mat();
+
+            // Преобразуем изображение в оттенки серого
             cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
+
+            // Применяем детектор границ Canny
             cv.Canny(gray, dst, lowThresh, highThresh, 3, false);
+
+            // Отображаем обработанное изображение на холсте
             cv.imshow("canvas", dst);
+
+            // Запускаем функцию поиска контуров
             findContours();
           };
           img.src = event.target.result;
@@ -43,28 +61,31 @@
         reader.readAsDataURL(e.target.files[0]);
       }
 
+      // Функция для поиска контуров
       function findContours() {
         let contours = new cv.MatVector();
         let hierarchy = new cv.Mat();
+
+        // Находим контуры на обработанном изображении
         cv.findContours(
           dst,
           contours,
           hierarchy,
-          cv.RETR_EXTERNAL,
-          cv.CHAIN_APPROX_SIMPLE
+          cv.RETR_EXTERNAL, // Тип возврата контуров
+          cv.CHAIN_APPROX_SIMPLE // Упрощенный метод хранения контуров
         );
 
-        // Отрисовка контуров
+        // Отрисовка контуров на новом изображении
         let dst2 = cv.Mat.zeros(dst.rows, dst.cols, cv.CV_8UC3);
         for (let i = 0; i < contours.size(); ++i) {
           cv.drawContours(
-            dst2,
-            contours,
-            i,
-            [0, 255, 0, 255],
-            2,
-            cv.LINE_8,
-            hierarchy,
+            dst2, // Исходное изображение для рисования
+            contours, // Список контуров
+            i, // Индекс текущего контура
+            [0, 255, 0, 255], // Цвет контура (зеленый)
+            2, // Толщина линии
+            cv.LINE_8, // Тип линии
+            hierarchy, // Иерархия контуров
             0
           );
 
@@ -77,7 +98,7 @@
               dst2,
               contours,
               i,
-              [255, 0, 0, 255],
+              [255, 0, 0, 255], // Цвет четырехугольного контура (синий)
               2,
               cv.LINE_8,
               hierarchy,
@@ -122,7 +143,10 @@
         }
         console.log("Количество четырехугольных фигур: " + quadrilateralCount);
 
+        // Отображение окончательного изображения на холсте
         cv.imshow("canvas", dst2);
+
+        // Освобождение ресурсов
         contours.delete();
         hierarchy.delete();
         dst2.delete();

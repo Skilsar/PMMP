@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>OpenCV.js Perspective Transformation</title>
+
+    <!-- Загрузка OpenCV.js с использованием emscripten -->
+    <script
+      async
+      src="https://docs.opencv.org/master/opencv.js"
+      onload="onOpenCvReady();"
+      type="text/javascript"
+    ></script>
+  </head>
+  <body>
+    <h1>OpenCV.js Perspective Transformation</h1>
+
+    <!-- Элемент для выбора изображения -->
+    <input type="file" id="imageInput" accept="image/*" />
+
+    <!-- Холсты для отображения изображений -->
+    <canvas id="imageCanvas" width="400" height="300"></canvas>
+    <canvas id="outputCanvas" width="400" height="300"></canvas>
+
+    <!-- Кнопка для выпрямления изображения -->
+    <button onclick="straightenImage()">Straighten Image</button>
+
+    <script>
+      let imgOriginal;
+      let imgCanvas;
+      let outputCanvas;
+
+      async function onOpenCvReady() {
+        // Загружаем изображение с холста
+        imgCanvas = document.getElementById("imageCanvas");
+        outputCanvas = document.getElementById("outputCanvas");
+
+        // Добавляем обработчик события изменения выбранного изображения
+        document
+          .getElementById("imageInput")
+          .addEventListener("change", handleImageUpload);
+
+        // Загружаем модуль cv из OpenCV.js
+        await cv.onRuntimeInitialized;
+      }
+
+      function handleImageUpload(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function (e) {
+          const imgElement = new Image();
+          imgElement.onload = function () {
+            const ctx = imgCanvas.getContext("2d");
+
+            // Отображаем выбранное изображение на холсте
+            imgCanvas.width = imgElement.width;
+            imgCanvas.height = imgElement.height;
+            ctx.drawImage(imgElement, 0, 0);
+
+            // Сохраняем оригинальное изображение
+            imgOriginal = cv.imread(imgCanvas);
+          };
+          imgElement.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+      }
+
+      function straightenImage() {
+        if (!imgOriginal) {
+          alert("Загрузите изображение сначала.");
+          return;
+        }
+
+        // Создаем матрицу для изображения в оттенках серого
+        let gray = new cv.Mat();
+        cv.cvtColor(imgOriginal, gray, cv.COLOR_RGBA2GRAY);
+
+        // Находим контуры на изображении
+        let contours = new cv.MatVector();
+        let hierarchy = new cv.Mat();
+        cv.findContours(
+          gray,
+          contours,
+          hierarchy,
+          cv.RETR_EXTERNAL,
+          cv.CHAIN_APPROX_SIMPLE
+        );
+
+        // Выбираем самый большой контур (контуры)
+        let largestContourIndex = 0;
+        let largestContourArea = 0;
+        for (let i = 0; i < contours.size(); i++) {
+          const contour = contours.get(i);
+          const contourArea = cv.contourArea(contour, false);
+          if (contourArea > largestContourArea) {
+            largestContourArea = contourArea;
+            largestContourIndex = i;
+          }
+        }
+
+        // Находим угловые точки контура
+        const largestContour = contours.get(largestContourIndex);
+        const epsilon = 0.05 * cv.arcLength(largestContour, true);
+        const approximatedContour = new cv.Mat();
+        cv.approxPolyDP(largestContour, approximatedContour, epsilon, true);
+
+        // Создаем матрицу преобразования для выпрямления
+        const srcPoints = new cv.Mat(
+          [
+            [approximatedContour.data32S[0], approximatedContour.data32S[1]],
+            [approximatedContour.data32S[2], approximatedContour.data32S[3]],
+            [approximatedContour.data32S[4], approximatedContour.data32S[5]],
+            [approximatedContour.data32S[6], approximatedContour.data32S[7]],
+          ],
+          cv.CV_32F
+        );
+
+        const dstWidth = imgOriginal.cols;
+        const dstHeight = imgOriginal.rows;
+        const dstPoints = new cv.Mat(
+          [
+            [0, 0],
+            [dstWidth, 0],
+            [dstWidth, dstHeight],
+            [0, dstHeight],
+          ],
+          cv.CV_32F
+        );
+
+        const perspectiveMatrix = cv.getPerspectiveTransform(
+          srcPoints,
+          dstPoints
+        );
+
+        // Применяем преобразование к изображению
+        const outputImg = new cv.Mat();
+        cv.warpPerspective(
+          imgOriginal,
+          outputImg,
+          perspectiveMatrix,
+          new cv.Size(dstWidth, dstHeight)
+        );
+
+        // Отображаем выпрямленное изображение
+        cv.imshow(outputCanvas, outputImg);
+
+        // Освобождаем ресурсы
+        gray.delete();
+        contours.delete();
+        hierarchy.delete();
+        approximatedContour.delete();
+        srcPoints.delete();
+        dstPoints.delete();
+        perspectiveMatrix.delete();
+        outputImg.delete();
+      }
+    </script>
+  </body>
+</html>
