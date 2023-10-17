@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Face Detection</title>
+    <script async src="./opencv.js" onload="onOpenCvReady();" type="text/javascript"></script>
+</head>
+<body>
+    <h1>Face Detection</h1>
+    <input type="file" id="fileInput" accept="image/*">
+    <canvas id="canvas"></canvas>
+    <div id="result"></div>
+
+    <script type="text/javascript">
+  
+        let faceCascade;
+        let eyeCascade;
+        let mouthCascade;
+        let smileCascade;
+        let canvas;
+        let ctx;
+        let resultDiv;
+
+         function onOpenCvReady() {
+         cv['onRuntimeInitialized']=()=>{
+         faceCascade = new cv.CascadeClassifier('haarcascade_frontalface_default.xml');
+                eyeCascade = new cv.CascadeClassifier();
+                smileCascade = new cv.CascadeClassifier();
+                mouthCascade = new cv.CascadeClassifier();
+
+                //faceCascade.load('haarcascade_frontalface_default.xml');
+                eyeCascade.load('./haarcascade_eye.xml');
+                smileCascade.load('path_to_smile_cascade.xml');
+                mouthCascade.load('path_to_mouth_cascade.xml');
+
+            canvas = document.getElementById('canvas');
+            ctx = canvas.getContext('2d');
+            resultDiv = document.getElementById('result');
+
+            document.getElementById('fileInput').addEventListener('change', handleFileSelect);
+         }
+        }
+
+        function handleFileSelect(evt) {
+            const file = evt.target.files[0];
+            if (file) {
+                const image = new Image();
+                image.src = URL.createObjectURL(file);
+                image.onload = function() {
+                    canvas.width = image.width;
+                    canvas.height = image.height;
+                    ctx.drawImage(image, 0, 0, image.width, image.height);
+                    detect();
+                };
+            }
+        }
+
+        function detect() {
+            const frame = new cv.Mat(canvas.height, canvas.width, cv.CV_8UC4);
+            const img = cv.imread(canvas);
+            img.copyTo(frame);
+
+            const gray = new cv.Mat();
+            cv.cvtColor(frame, gray, cv.COLOR_RGBA2GRAY);
+            cv.equalizeHist(gray, gray);
+
+            const faces = new cv.RectVector();
+            faceCascade.detectMultiScale(gray, faces);
+
+            if (faces.size() > 0) {
+                for (let i = 0; i < faces.size(); ++i) {
+                    const faceRect = faces.get(i);
+                    const point1 = new cv.Point(faceRect.x, faceRect.y);
+                    const point2 = new cv.Point(faceRect.x + faceRect.width, faceRect.y + faceRect.height);
+                    cv.rectangle(frame, point1, point2, [255, 0, 0, 255], 2);
+
+                    const eyes = new cv.RectVector();
+                    eyeCascade.detectMultiScale(gray, eyes);
+                    for (let j = 0; j < eyes.size(); ++j) {
+                        const eyeRect = eyes.get(j);
+                        const eyePoint1 = new cv.Point(faceRect.x + eyeRect.x, faceRect.y + eyeRect.y);
+                        const eyePoint2 = new cv.Point(faceRect.x + eyeRect.x + eyeRect.width, faceRect.y + eyeRect.y + eyeRect.height);
+                        cv.rectangle(frame, eyePoint1, eyePoint2, [0, 255, 0, 255], 2);
+                    }
+
+                    const mouths = new cv.RectVector();
+                    mouthCascade.detectMultiScale(gray, mouths);
+                    for (let k = 0; k < mouths.size(); ++k) {
+                        const mouthRect = mouths.get(k);
+                        const mouthPoint1 = new cv.Point(faceRect.x + mouthRect.x, faceRect.y + mouthRect.y);
+                        const mouthPoint2 = new cv.Point(faceRect.x + mouthRect.x + mouthRect.width, faceRect.y + mouthRect.y + mouthRect.height);
+                        cv.rectangle(frame, mouthPoint1, mouthPoint2, [0, 0, 255, 255], 2);
+                    }
+                }
+
+                const hasMouth = mouths.size() > 0;
+                const maskMessage = hasMouth ? "Медицинская маска надета" : "Медицинская маска не надета";
+                resultDiv.innerHTML = maskMessage;
+            } else {
+                resultDiv.innerHTML = "Лицо не обнаружено";
+            }
+
+            frame.delete();
+            img.delete();
+            gray.delete();
+            faces.delete();
+            eyes.delete();
+            mouths.delete();
+        }
+    </script>
+</body>
+</html>
